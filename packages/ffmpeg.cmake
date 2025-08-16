@@ -143,16 +143,6 @@ ExternalProject_Add(ffmpeg
         --enable-decoder=mjpeg*
         --enable-decoder=wmv*
 
-  		--enable-decoder=rv10
-		--enable-decoder=rv20
-		--enable-decoder=rv30
-		--enable-decoder=rv40
-		--enable-decoder=cook
-		--enable-decoder=atrac3
-		--enable-decoder=sipr
-		--enable-decoder=ra_144
-		--enable-decoder=ra_288
-
         --enable-decoder=aac*
         --enable-decoder=ac3
         --enable-decoder=alac
