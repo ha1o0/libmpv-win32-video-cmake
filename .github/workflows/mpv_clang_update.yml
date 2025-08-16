@@ -1,4 +1,4 @@
-name: mpv clang
+name: mpv clang update
 defaults:
   run:
     shell: bash
