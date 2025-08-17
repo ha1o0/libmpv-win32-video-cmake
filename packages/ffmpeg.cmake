@@ -62,16 +62,12 @@ ExternalProject_Add(ffmpeg
         --disable-protocols
         --disable-filters
         --disable-doc
-        --disable-postproc
         --disable-programs
-        --disable-gray
-        --disable-swscale-alpha
 
         --enable-bsfs
 
         --enable-amf
         --enable-dxva2
-        --enable-libmfx
         --enable-d3d11va
 
         --disable-vaapi
