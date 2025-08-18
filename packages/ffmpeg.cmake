@@ -85,7 +85,6 @@ ExternalProject_Add(ffmpeg
         --disable-bsf=text2movsub
         --disable-bsf=eac3_core
 
-        --enable-small
         --enable-hwaccels
         --enable-optimizations
         --enable-runtime-cpudetect
