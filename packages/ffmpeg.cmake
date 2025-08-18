@@ -45,7 +45,7 @@ ExternalProject_Add(ffmpeg
         --pkg-config-flags=--static
         --enable-cross-compile
 
-        --disable-gpl
+        --enable-gpl
         --disable-nonfree
         --enable-version3
         --enable-static
