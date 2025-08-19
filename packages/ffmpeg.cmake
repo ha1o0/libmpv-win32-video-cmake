@@ -58,9 +58,7 @@ ExternalProject_Add(ffmpeg
         --disable-decoders
         --disable-encoders
         --disable-demuxers
-        --disable-parsers
         --disable-protocols
-        --disable-filters
         --disable-doc
         --disable-programs
 
