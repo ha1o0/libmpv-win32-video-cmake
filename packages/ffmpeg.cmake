@@ -137,15 +137,15 @@ ExternalProject_Add(ffmpeg
         --enable-decoder=mjpeg*
         --enable-decoder=wmv*
 
-  		--enable-decoder=rv10
-		--enable-decoder=rv20
-		--enable-decoder=rv30
-		--enable-decoder=rv40
-		--enable-decoder=cook
-		--enable-decoder=atrac3
-		--enable-decoder=sipr
-		--enable-decoder=ra_144
-		--enable-decoder=ra_288
+        --enable-decoder=rv10
+        --enable-decoder=rv20
+        --enable-decoder=rv30
+        --enable-decoder=rv40
+        --enable-decoder=cook
+        --enable-decoder=atrac3
+        --enable-decoder=sipr
+        --enable-decoder=ra_144
+        --enable-decoder=ra_288
 
         --enable-decoder=aac*
         --enable-decoder=ac3
@@ -307,6 +307,11 @@ ExternalProject_Add(ffmpeg
 	--enable-encoder=jpegls
 
         --enable-network
+
+        --enable-runtime-cpudetect
+        --enable-filter=scale
+        --enable-filter=format
+        --enable-opengl
         
         ${ffmpeg_cuda}
         ${ffmpeg_lto}
