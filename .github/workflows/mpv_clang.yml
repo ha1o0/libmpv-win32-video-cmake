@@ -29,6 +29,16 @@ on:
         required: false
         default: false
         type: boolean
+      build_targets:
+        description: 'JSON array of targets, for example ["x86_64"] or ["x86_64","x86_64_v3","aarch64"]'
+        required: false
+        default: '["x86_64"]'
+        type: string
+      run_gcc:
+        description: 'Also trigger the GCC workflow after clang finishes'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   build_mpv:
@@ -38,7 +48,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        bit: [i686, x86_64, x86_64_v3, aarch64]
+        bit: ${{ fromJSON(github.event.inputs.build_targets) }}
     env:
       BIT: ${{ matrix.bit }}
     container:
@@ -255,8 +265,10 @@ jobs:
       - name: Moving archives
         run: |
           mkdir -p release
-          mv release_i686/* release_x86_64/* release_x86_64_v3/* release_aarch64/* release
-          du -ah release/*
+          for dir in release_i686 release_x86_64 release_x86_64_v3 release_aarch64; do
+            if [[ -d "$dir" ]]; then mv "$dir"/* release/ 2>/dev/null || true; fi
+          done
+          du -ah release/* || true
 
       - name: Uploading packages to Sourceforge
         id: upload_packages_sf
@@ -330,6 +342,7 @@ jobs:
     name: Run mpv_gcc
     runs-on: ubuntu-latest
     needs: build_mpv
+    if: ${{ github.event.inputs.run_gcc == 'true' }}
     env:
       GH_TOKEN: ${{ github.token }}
       GH_COMMAND: ${{ github.event.inputs.command }}

@@ -107,6 +107,12 @@ This branch builds mpv from `https://github.com/ha1o0/mpv.git`, branch `my-gpu-n
 
 The mpv GitHub Actions workflows upload `libmpv-<arch>-dev` artifacts containing `libmpv-2.dll`, `libmpv.dll.a`, and mpv headers for downstream consumers such as bota/media-kit.
 
+The default GitHub Actions target list is `["x86_64"]`. To build more clang targets later, run the workflow with:
+
+    ["x86_64","x86_64_v3","aarch64"]
+
+`x86_64_v3` is a modern CPU baseline build, and `aarch64` is for Windows ARM64. `i686` is still supported by the scripts but is not part of the default bota build.
+
 ## Compiling with Clang
 
 Supported target architecture (`TARGET_ARCH`) with clang is: `x86_64-w64-mingw32` , `i686-w64-mingw32` , `aarch64-w64-mingw32`. The `aarch64` are untested.
