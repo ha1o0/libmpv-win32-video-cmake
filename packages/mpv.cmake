@@ -24,7 +24,8 @@ ExternalProject_Add(mpv
         libsdl2
         subrandr
         libsixel
-    GIT_REPOSITORY https://github.com/mpv-player/mpv.git
+    GIT_REPOSITORY ${MPV_GIT_REPOSITORY}
+    GIT_TAG ${MPV_GIT_TAG}
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
     UPDATE_COMMAND ""

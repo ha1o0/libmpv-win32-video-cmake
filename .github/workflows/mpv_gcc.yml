@@ -3,6 +3,10 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  actions: write
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -64,7 +68,7 @@ jobs:
 
       - uses: actions/checkout@main
         with:
-          ref: master
+          ref: ${{ github.ref }}
 
       - name: Loading ${{ matrix.bit }} toolchain cache
         uses: actions/cache/restore@main
@@ -145,6 +149,12 @@ jobs:
           name: mpv-${{ matrix.bit }}
           path: release_${{ matrix.bit }}/mpv-${{ env.arch }}*
 
+      - name: Uploading ${{ matrix.bit }} libmpv dev
+        uses: actions/upload-artifact@master
+        with:
+          name: libmpv-${{ matrix.bit }}-dev
+          path: release_${{ matrix.bit }}/mpv-dev-${{ env.arch }}*
+
       - name: Cleaning build directory
         if: always()
         run: |
@@ -200,7 +210,7 @@ jobs:
 
       - uses: actions/checkout@main
         with:
-          ref: master
+          ref: ${{ github.ref }}
 
       - name: Loading release_x86_64 cache
         uses: actions/cache/restore@main
@@ -245,8 +255,8 @@ jobs:
         if: ${{ github.event.inputs.github_release == 'true' && github.event.inputs.mpv_tarball == 'false' }}
         continue-on-error: true
         run: |
-          id=$(curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -X GET -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest | jq -r '.id')
-          for file in release/*.7z; do curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -X POST -H "Accept: application/vnd.github.v3+json" -H "Content-Type: $(file -b --mime-type $file)" https://uploads.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/$id/assets?name=$(basename $file) --data-binary @$file; done
+          id=$(curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -X GET -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/releases/latest | jq -r '.id')
+          for file in release/*.7z; do curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -X POST -H "Accept: application/vnd.github.v3+json" -H "Content-Type: $(file -b --mime-type $file)" https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$id/assets?name=$(basename $file) --data-binary @$file; done
 
       - name: Pruning tags
         if: false
@@ -256,16 +266,16 @@ jobs:
           tag_list=($(git tag | sort -r))
           old=${tag_list[@]:30}
           for tag in ${old[@]}; do
-            id=$(curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -X GET -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/tags/$tag | jq -r '.id')
-            curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/$id
+            id=$(curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -X GET -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$tag | jq -r '.id')
+            curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$id
             git tag -d $tag
           done
-          git push --tags --prune https://shinchiro:$GH_TOKEN@github.com/shinchiro/mpv-winbuild-cmake
+          git push --tags --prune https://$GITHUB_ACTOR:$GH_TOKEN@github.com/$GITHUB_REPOSITORY
 
       - name: Delete releases cache
         if: ${{ github.event.inputs.github_release == 'false' || steps.upload_packages_gh.outcome == 'success' }}
         run: |
-          curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -o /dev/null -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/actions/caches?key=$release_x86_64_key
+          curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -o /dev/null -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/actions/caches?key=$release_x86_64_key
 
   gist:
     name: Gist

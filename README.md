@@ -97,6 +97,16 @@ After that, build mpv as usual:
 
     ninja mpv
 
+## mpv gpu-next fork
+
+This branch builds mpv from `https://github.com/ha1o0/mpv.git`, branch `my-gpu-next`, by default. Override it locally with:
+
+    cmake -DMPV_GIT_REPOSITORY="https://github.com/ha1o0/mpv.git" \
+    -DMPV_GIT_TAG="my-gpu-next" \
+    ...
+
+The mpv GitHub Actions workflows upload `libmpv-<arch>-dev` artifacts containing `libmpv-2.dll`, `libmpv.dll.a`, and mpv headers for downstream consumers such as bota/media-kit.
+
 ## Compiling with Clang
 
 Supported target architecture (`TARGET_ARCH`) with clang is: `x86_64-w64-mingw32` , `i686-w64-mingw32` , `aarch64-w64-mingw32`. The `aarch64` are untested.

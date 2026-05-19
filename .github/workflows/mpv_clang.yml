@@ -3,6 +3,10 @@ defaults:
   run:
     shell: bash
 
+permissions:
+  actions: write
+  contents: write
+
 on:
   workflow_dispatch:
     inputs:
@@ -67,7 +71,7 @@ jobs:
 
       - uses: actions/checkout@main
         with:
-          ref: master
+          ref: ${{ github.ref }}
 
       - name: Loading clang sysroot cache
         uses: actions/cache/restore@main
@@ -145,6 +149,12 @@ jobs:
           name: mpv-${{ matrix.bit }}
           path: release_${{ matrix.bit }}/mpv-${{ env.arch }}*
 
+      - name: Uploading ${{ matrix.bit }} libmpv dev
+        uses: actions/upload-artifact@master
+        with:
+          name: libmpv-${{ matrix.bit }}-dev
+          path: release_${{ matrix.bit }}/mpv-dev-${{ env.arch }}*
+
       - name: Uploading ${{ matrix.bit }} debug
         uses: actions/upload-artifact@master
         with:
@@ -216,7 +226,7 @@ jobs:
 
       - uses: actions/checkout@main
         with:
-          ref: master
+          ref: ${{ github.ref }}
 
       - name: Loading release_i686 cache
         uses: actions/cache/restore@main
@@ -279,12 +289,12 @@ jobs:
         run: |
           short_date=$(date "+%Y%m%d")
           body=$(cat <<END
-          ![GitHub release (by tag)](https://img.shields.io/github/downloads/shinchiro/mpv-winbuild-cmake/$short_date/total?label=Downloads)
+          ![GitHub release (by tag)](https://img.shields.io/github/downloads/$GITHUB_REPOSITORY/$short_date/total?label=Downloads)
 
           **Workflow run**: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID
           END
           )
-          id=$(curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -X POST -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases -d @- <<END | jq -r '.id'
+          id=$(curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -X POST -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/releases -d @- <<END | jq -r '.id'
           {
             "tag_name": "$short_date",
             "name": "$short_date",
@@ -292,7 +302,7 @@ jobs:
           }
           END
           )
-          for file in release/*.7z; do curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -X POST -H "Accept: application/vnd.github.v3+json" -H "Content-Type: $(file -b --mime-type $file)" https://uploads.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/$id/assets?name=$(basename $file) --data-binary @$file; done
+          for file in release/*.7z; do curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -X POST -H "Accept: application/vnd.github.v3+json" -H "Content-Type: $(file -b --mime-type $file)" https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$id/assets?name=$(basename $file) --data-binary @$file; done
 
       - name: Pruning tags
         continue-on-error: true
@@ -302,19 +312,19 @@ jobs:
           tag_list=($(git tag | sort -r))
           old=${tag_list[@]:30}
           for tag in ${old[@]}; do
-            id=$(curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -X GET -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/tags/$tag | jq -r '.id')
-            curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/$id
+            id=$(curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -X GET -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/$tag | jq -r '.id')
+            curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/releases/$id
             git tag -d $tag
           done
-          git push --tags --prune https://shinchiro:$GH_TOKEN@github.com/shinchiro/mpv-winbuild-cmake
+          git push --tags --prune https://$GITHUB_ACTOR:$GH_TOKEN@github.com/$GITHUB_REPOSITORY
 
       - name: Delete releases cache
         if: ${{ github.event.inputs.github_release == 'false' || steps.upload_packages_gh.outcome == 'success' }}
         run: |
-          curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -o /dev/null -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/actions/caches?key=$release_i686_key
-          curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -o /dev/null -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/actions/caches?key=$release_x86_64_key
-          curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -o /dev/null -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/actions/caches?key=$release_x86_64_v3_key
-          curl -u shinchiro:$GH_TOKEN $CURL_RETRIES -s -o /dev/null -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/actions/caches?key=$release_aarch64_key
+          curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -o /dev/null -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/actions/caches?key=$release_i686_key
+          curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -o /dev/null -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/actions/caches?key=$release_x86_64_key
+          curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -o /dev/null -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/actions/caches?key=$release_x86_64_v3_key
+          curl -u "$GITHUB_ACTOR:$GH_TOKEN" $CURL_RETRIES -s -o /dev/null -X DELETE -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/actions/caches?key=$release_aarch64_key
 
   call_workflow:
     name: Run mpv_gcc
@@ -326,9 +336,9 @@ jobs:
     steps:
       - name: Run mpv_gcc.yml
         run: |
-          curl -u shinchiro:$GH_TOKEN -X POST -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/actions/workflows/mpv_gcc.yml/dispatches -d @- <<EOF
+          curl -u "$GITHUB_ACTOR:$GH_TOKEN" -X POST -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/mpv_gcc.yml/dispatches -d @- <<EOF
           {
-            "ref": "master",
+            "ref": "$GITHUB_REF_NAME",
             "inputs": {
               "sourceforge": "false",
               "github_release": "true",
@@ -342,7 +352,7 @@ jobs:
     name: Gist
     runs-on: ubuntu-latest
     needs: build_mpv
-    if: ${{ always() }}
+    if: false
     env:
       GH_TOKEN: ${{ secrets.GIST_TOKEN }}
       RUN_ID: ${{ github.run_id }}
