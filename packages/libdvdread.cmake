@@ -4,6 +4,8 @@ ExternalProject_Add(libdvdread
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
     UPDATE_COMMAND ""
+    # libdvdread and libbluray both expose default filesystem helpers on Windows.
+    PATCH_COMMAND ${EXEC} git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/libdvdread-*.patch
     CONFIGURE_COMMAND ${EXEC} sed -i [['/^if import/,/endif/d']] <SOURCE_DIR>/meson.build
     COMMAND ${EXEC} meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
