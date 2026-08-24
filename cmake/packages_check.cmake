@@ -22,8 +22,9 @@ elseif(COMPILER_TOOLCHAIN STREQUAL "clang")
     set(mpv_lto_mode "-Db_lto_mode=thin")
     set(mpv_copy_debug COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/mpv.pdb ${CMAKE_CURRENT_BINARY_DIR}/mpv-debug/mpv.pdb)
     if(CLANG_PACKAGES_LTO)
-        set(cargo_lto_rustflags "CARGO_PROFILE_RELEASE_LTO=thin
-                                 RUSTFLAGS='-C linker-plugin-lto -C embed-bitcode -C lto=thin'")
+        # Keep Rust ThinLTO inside rustc: linker-plugin LTO requires rustc and
+        # the external LLD linker to use a compatible LLVM major version.
+        set(cargo_lto_rustflags "CARGO_PROFILE_RELEASE_LTO=thin")
         set(ffmpeg_lto "--enable-lto=thin")
         if(NOT (GCC_ARCH_HAS_AVX OR (TARGET_CPU STREQUAL "aarch64")))
             set(zlib_nlto "LTO=0")
