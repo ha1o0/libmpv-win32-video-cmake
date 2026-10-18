@@ -1,7 +1,13 @@
-# curl 8.23.0: static transport for mpv, with HTTP/2 and Windows certificate trust.
+# curl 8.23.0: static transport matching upstream's HTTP/2 + HTTP/3 features.
 ExternalProject_Add(curl
     DEPENDS
         nghttp2
+        nghttp3
+        ngtcp2
+        c-ares
+        libpsl
+        libssh
+        openssl
         zlib
         brotli
         zstd
@@ -11,6 +17,7 @@ ExternalProject_Add(curl
     GIT_RESET 3163ec065643ba20709f190111f42c3e1fe95273
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
+    PATCH_COMMAND ${EXEC} git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/curl-0001-libssh-include-scp-declarations.patch
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ${EXEC} CONF=1 cmake -S <SOURCE_DIR> -B <BINARY_DIR>
         -G Ninja
@@ -26,20 +33,40 @@ ExternalProject_Add(curl
         -DBUILD_LIBCURL_DOCS=OFF
         -DBUILD_MISC_DOCS=OFF
         -DENABLE_CURL_MANUAL=OFF
-        -DCURL_USE_SCHANNEL=ON
-        -DCURL_USE_OPENSSL=OFF
+        -DCURL_USE_SCHANNEL=OFF
+        -DCURL_USE_OPENSSL=ON
         -DCURL_USE_MBEDTLS=OFF
+        -DOPENSSL_USE_STATIC_LIBS=ON
+        -DCURL_CA_NATIVE=ON
+        -DCURL_CA_BUNDLE=none
+        -DCURL_CA_PATH=none
         -DUSE_NGHTTP2=ON
         -DNGHTTP2_USE_STATIC_LIBS=ON
         -DCMAKE_REQUIRE_FIND_PACKAGE_NGHTTP2=ON
+        -DUSE_NGTCP2=ON
+        -DNGTCP2_USE_STATIC_LIBS=ON
+        -DNGHTTP3_USE_STATIC_LIBS=ON
+        -DENABLE_ARES=ON
+        -DCARES_USE_STATIC_LIBS=ON
+        -DENABLE_THREADED_RESOLVER=ON
+        -DENABLE_UNICODE=ON
+        -DCURL_WINDOWS_SSPI=ON
+        -DUSE_ECH=ON
+        -DUSE_HTTPSRR=ON
+        -DUSE_SSLS_EXPORT=ON
+        -DUSE_PROXY_HTTP3=ON
+        -DCURL_USE_PKGCONFIG=ON
+        -DCMAKE_DISABLE_FIND_PACKAGE_Perl=ON
+        "-DCMAKE_C_FLAGS='-DNGHTTP3_STATICLIB -DNGHTTP2_STATICLIB -DNGTCP2_STATICLIB -lz -lbrotlienc -lbrotlidec -lbrotlicommon -lzstd -lcrypt32 -lsecur32'"
         -DCURL_ZLIB=ON
         -DCURL_BROTLI=ON
         -DCURL_ZSTD=ON
         -DUSE_WIN32_IDN=ON
         -DUSE_LIBIDN2=OFF
-        -DCURL_USE_LIBPSL=OFF
+        -DCURL_USE_LIBPSL=ON
         -DCURL_USE_LIBSSH2=OFF
-        -DCURL_USE_LIBSSH=OFF
+        -DCURL_USE_LIBSSH=ON
+        -DLIBSSH_USE_STATIC_LIBS=ON
     BUILD_COMMAND ${EXEC} ninja -C <BINARY_DIR>
     INSTALL_COMMAND ${EXEC} ninja -C <BINARY_DIR> install
     LOG_DOWNLOAD 1 LOG_UPDATE 1 LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1
@@ -57,4 +84,13 @@ ExternalProject_Add_Step(curl verify-features
 )
 
 force_rebuild_git(curl)
+# Old source caches can still be on a tracking branch. Detach at our pin before
+# patching even when that branch has not advanced since the previous CI run.
+ExternalProject_Add_Step(curl pin-source
+    INDEPENDENT TRUE
+    DEPENDEES update write-head
+    DEPENDERS patch
+    COMMAND ${EXEC} git -C <SOURCE_DIR> checkout --detach --force 3163ec065643ba20709f190111f42c3e1fe95273
+    LOG 1
+)
 cleanup(curl verify-features)

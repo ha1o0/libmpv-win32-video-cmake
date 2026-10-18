@@ -113,25 +113,39 @@ The default GitHub Actions target list is `["x86_64"]`. To build more clang targ
 
 `x86_64_v3` is a modern CPU baseline build, and `aarch64` is for Windows ARM64. `i686` is still supported by the scripts but is not part of the default bota build.
 
-### Windows HTTP/2 transport
+### Windows HTTP/2 and HTTP/3 transport
 
 The fork build explicitly enables mpv's libcurl stream backend. It builds pinned
-curl 8.23.0 and nghttp2 1.70.0 as static libraries, with Schannel using Windows
-certificate trust. zlib, brotli and zstd support remain available. No separate
-`curl.exe`, libcurl DLL or nghttp2 DLL is needed in the downstream app package.
-The installed target metadata is checked for HTTP/HTTPS, HTTP/2, Schannel and
-static-link dependencies before mpv builds. Missing capabilities fail the build.
+curl 8.23.0, nghttp2 1.70.0, nghttp3 1.18.0, ngtcp2 1.25.0 and c-ares 1.34.8
+as static libraries. OpenSSL and libpsl use the same pinned snapshots as
+upstream mpv-winbuild-cmake (`1f8d2e76255abc48f0456d9be99b4cab9c6566e6`).
+The OpenSSL pin is a 4.1.0-dev snapshot, matching upstream rather than a floating
+development branch; validate the rebuilt FFmpeg/libssh TLS paths as well.
+OpenSSL replaces Schannel for HTTP/3 and ECH; Windows certificate trust remains
+enabled with `CURL_CA_NATIVE`. The build also enables upstream's HTTPS DNS
+records, SSL session export, HTTP/3 proxy support, SSPI, Unicode, libpsl and
+libssh. zlib, brotli and zstd support remain available. No separate `curl.exe`
+or networking DLLs are needed in the downstream app package.
+The installed target metadata is checked for these features and static-link
+dependencies before mpv builds. Missing capabilities fail the build.
 
 Use the **mpv clang** workflow with `build_targets=["x86_64"]` initially. Leave
 `mpv_tarball`, `sourceforge`, `github_release` and `run_gcc` disabled to build the
 custom `zcopy` kernel and collect the `libmpv-x86_64-dev` test artifact only.
-The existing source/toolchain caches can be reused: curl and nghttp2 participate
-in `download`/`update`, and the changed mpv configuration requires libcurl.
-The FFmpeg revision and the fork's video/render patches are unchanged.
+The existing compiler/toolchain caches can be reused; leave the custom command
+field empty. New dependencies participate in `download`/`update`. OpenSSL's
+explicit QUIC/ECH configuration also invalidates an older cached configuration.
+FFmpeg and libssh may rebuild against the pinned OpenSSL, but their feature
+configuration and FFmpeg's fixed revision are unchanged. The fork's video/render
+patches are unchanged.
 
 At runtime, verify the `[curl]` stream-open log and HTTP/2 negotiation on a
-compatible HTTPS server; let `curl-http-version=auto` negotiate HTTP/1.1 for
-other servers. `curl-enabled=no` selects the existing FFmpeg transport for A/B
+compatible HTTPS server. HTTP/3 is a compiled capability, not a guarantee that
+`curl-http-version=auto` uses QUIC. Test with `curl-http-version=3` to allow
+fallback to HTTP/2 or HTTP/1.1; `3only` requires HTTP/3 and is for diagnostics.
+Ordinary HTTP proxies may not carry QUIC. Proxy routing still needs the separate
+mpv curl adaptation for explicit direct/proxy decisions; this build change does
+not implement it. `curl-enabled=no` selects the existing FFmpeg transport for A/B
 testing. The upstream release-tarball build path is unchanged and is not the
 custom-kernel test path. Validate playback, proxy/authentication, subtitles,
 seek/resume, cancellation, hardware decoding, HDR and gpu-next before adoption.

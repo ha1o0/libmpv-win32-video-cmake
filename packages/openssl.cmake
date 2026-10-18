@@ -4,6 +4,10 @@ ExternalProject_Add(openssl
         zstd
         brotli
     GIT_REPOSITORY https://github.com/openssl/openssl.git
+    # Same OpenSSL snapshot as upstream's HTTP/3/ECH build.
+    GIT_REMOTE_NAME origin
+    GIT_TAG d8bf6cdd4849925c30e4f1911c7acb49cb34b702
+    GIT_RESET d8bf6cdd4849925c30e4f1911c7acb49cb34b702
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--sparse --filter=tree:0"
     GIT_CLONE_POST_COMMAND "sparse-checkout set --no-cone /* !test"
@@ -16,6 +20,8 @@ ExternalProject_Add(openssl
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=lib
         --release
+        enable-quic
+        enable-ech
         no-autoload-config
         ${openssl_target}
         ${openssl_ec_opt}
@@ -63,4 +69,11 @@ ExternalProject_Add(openssl
 )
 
 force_rebuild_git(openssl)
+ExternalProject_Add_Step(openssl pin-source
+    INDEPENDENT TRUE
+    DEPENDEES update write-head
+    DEPENDERS patch
+    COMMAND ${EXEC} git -C <SOURCE_DIR> checkout --detach --force d8bf6cdd4849925c30e4f1911c7acb49cb34b702
+    LOG 1
+)
 cleanup(openssl install)

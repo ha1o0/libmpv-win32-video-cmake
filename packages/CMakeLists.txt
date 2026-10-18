@@ -87,6 +87,10 @@ list(APPEND ep
     libaribcaption
     libsixel
     nghttp2
+    nghttp3
+    ngtcp2
+    c-ares
+    libpsl
     curl
     ffmpeg
     mpv
