@@ -99,19 +99,42 @@ After that, build mpv as usual:
 
 ## mpv gpu-next fork
 
-This branch builds mpv from `https://github.com/ha1o0/mpv.git`, branch `my-gpu-next`, by default. Override it locally with:
+This branch builds mpv from `https://github.com/ha1o0/mpv.git`, branch `zcopy`, by default. Override it locally with:
 
     cmake -DMPV_GIT_REPOSITORY="https://github.com/ha1o0/mpv.git" \
-    -DMPV_GIT_TAG="my-gpu-next" \
+    -DMPV_GIT_TAG="zcopy" \
     ...
 
-The mpv GitHub Actions workflows upload `libmpv-<arch>-dev` artifacts containing `libmpv-2.dll`, `libmpv.dll.a`, and mpv headers for downstream consumers such as bota/media-kit.
+This repository's GitHub Actions workflows upload `libmpv-<arch>-dev` artifacts containing `libmpv-2.dll`, `libmpv.dll.a`, and mpv headers for downstream consumers such as bota/media-kit.
 
 The default GitHub Actions target list is `["x86_64"]`. To build more clang targets later, run the workflow with:
 
     ["x86_64","x86_64_v3","aarch64"]
 
 `x86_64_v3` is a modern CPU baseline build, and `aarch64` is for Windows ARM64. `i686` is still supported by the scripts but is not part of the default bota build.
+
+### Windows HTTP/2 transport
+
+The fork build explicitly enables mpv's libcurl stream backend. It builds pinned
+curl 8.23.0 and nghttp2 1.70.0 as static libraries, with Schannel using Windows
+certificate trust. zlib, brotli and zstd support remain available. No separate
+`curl.exe`, libcurl DLL or nghttp2 DLL is needed in the downstream app package.
+The installed target metadata is checked for HTTP/HTTPS, HTTP/2, Schannel and
+static-link dependencies before mpv builds. Missing capabilities fail the build.
+
+Use the **mpv clang** workflow with `build_targets=["x86_64"]` initially. Leave
+`mpv_tarball`, `sourceforge`, `github_release` and `run_gcc` disabled to build the
+custom `zcopy` kernel and collect the `libmpv-x86_64-dev` test artifact only.
+The existing source/toolchain caches can be reused: curl and nghttp2 participate
+in `download`/`update`, and the changed mpv configuration requires libcurl.
+The FFmpeg revision and the fork's video/render patches are unchanged.
+
+At runtime, verify the `[curl]` stream-open log and HTTP/2 negotiation on a
+compatible HTTPS server; let `curl-http-version=auto` negotiate HTTP/1.1 for
+other servers. `curl-enabled=no` selects the existing FFmpeg transport for A/B
+testing. The upstream release-tarball build path is unchanged and is not the
+custom-kernel test path. Validate playback, proxy/authentication, subtitles,
+seek/resume, cancellation, hardware decoding, HDR and gpu-next before adoption.
 
 ## Compiling with Clang
 

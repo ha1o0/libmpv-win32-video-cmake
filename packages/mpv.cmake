@@ -1,6 +1,7 @@
 ExternalProject_Add(mpv
     DEPENDS
         angle-headers
+        curl
         ffmpeg
         fribidi
         lcms2
@@ -41,6 +42,7 @@ ExternalProject_Add(mpv
         -Db_lto=true
         ${mpv_lto_mode}
         -Dlibmpv=true
+        -Dlibcurl=enabled
         -Dpdf-build=enabled
         -Dlua=enabled
         -Djavascript=enabled
