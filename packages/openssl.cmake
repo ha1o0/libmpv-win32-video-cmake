@@ -63,8 +63,14 @@ ExternalProject_Add(openssl
         no-dh
         no-bf
         zlib
-    BUILD_COMMAND ${MAKE} build_sw
-    INSTALL_COMMAND ${MAKE} install_sw
+    # Restored build stamps can outlive a source reset/checkout. OpenSSL's
+    # implicit Makefile refresh deliberately fails with "run make again";
+    # regenerate explicitly before both phases, including a cached build that
+    # reaches install directly. Keep the saved Configure options unchanged.
+    BUILD_COMMAND ${EXEC} CONF=1 perl configdata.pm --reconfigure
+    COMMAND ${MAKE} build_sw
+    INSTALL_COMMAND ${EXEC} CONF=1 perl configdata.pm --reconfigure
+    COMMAND ${MAKE} install_sw
     LOG_DOWNLOAD 1 LOG_UPDATE 1 LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1
 )
 

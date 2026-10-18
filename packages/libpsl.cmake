@@ -6,9 +6,12 @@ ExternalProject_Add(libpsl
     GIT_RESET aa3a80e18f25caf3916636c8668dcc0fff7c016d
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
-    GIT_SUBMODULES ""
+    GIT_SUBMODULES list
     UPDATE_COMMAND ""
-    CONFIGURE_COMMAND ${EXEC} echo > <SOURCE_DIR>/tools/meson.build
+    # The built-in PSL is a pinned submodule, not part of libpsl's own tree.
+    # Also initialize it here for source caches cloned with submodules disabled.
+    CONFIGURE_COMMAND ${EXEC} git -C <SOURCE_DIR> submodule update --init list
+    COMMAND ${EXEC} echo > <SOURCE_DIR>/tools/meson.build
     COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=${MINGW_INSTALL_PREFIX}/lib

@@ -143,12 +143,30 @@ At runtime, verify the `[curl]` stream-open log and HTTP/2 negotiation on a
 compatible HTTPS server. HTTP/3 is a compiled capability, not a guarantee that
 `curl-http-version=auto` uses QUIC. Test with `curl-http-version=3` to allow
 fallback to HTTP/2 or HTTP/1.1; `3only` requires HTTP/3 and is for diagnostics.
-Ordinary HTTP proxies may not carry QUIC. Proxy routing still needs the separate
-mpv curl adaptation for explicit direct/proxy decisions; this build change does
-not implement it. `curl-enabled=no` selects the existing FFmpeg transport for A/B
+Ordinary HTTP proxies may not carry QUIC. The mpv build applies a curl routing
+patch: an explicitly empty `http-proxy` disables environment proxies, and an
+explicit proxy is not bypassed by `NO_PROXY`. Leaving the option unset retains
+libcurl's environment behavior. This patch must be in the build used by the app.
+The second mpv patch honors `network-timeout` for inactive header/body reads and
+caps connect timeout by it, excluding ring-buffer backpressure. Optional
+`curl-reconnect-streamed=yes` permits bounded unseekable HTTP reconnects;
+`curl-retry-delay-max=5` schedules 1/3/5-second backoff without stalling other
+transfers. Closing, cancellation and seeking retire pending retries. The app
+checks these options before enabling curl, retaining FFmpeg on incomplete cores.
+`curl-enabled=no` selects the existing FFmpeg transport for A/B
 testing. The upstream release-tarball build path is unchanged and is not the
 custom-kernel test path. Validate playback, proxy/authentication, subtitles,
 seek/resume, cancellation, hardware decoding, HDR and gpu-next before adoption.
+
+Focused native policy test (requires Python, CMake, a C11 compiler and libcurl):
+
+```sh
+python tests/test_curl_network_policy.py --mpv-source /path/to/mpv
+```
+
+For a Windows static libcurl installation, add `--curl-prefix /path/to/prefix`.
+This tests actual patched C functions against local HTTP fixtures, not a full
+mpv cross build. It does not modify the supplied source checkout.
 
 ## Compiling with Clang
 

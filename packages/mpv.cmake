@@ -29,6 +29,8 @@ ExternalProject_Add(mpv
     GIT_TAG ${MPV_GIT_TAG}
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
+    PATCH_COMMAND ${EXEC} git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/mpv-0001-curl-honor-explicit-proxy-routing.patch
+        ${CMAKE_CURRENT_SOURCE_DIR}/mpv-0002-curl-preserve-network-policy.patch
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
