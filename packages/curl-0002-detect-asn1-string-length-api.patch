@@ -1,0 +1,94 @@
+From: Floe contributors <recipe@example.invalid>
+Subject: [PATCH] openssl: detect ASN1 string length API instead of dev version
+
+The pinned OpenSSL snapshot advertises 4.1.0-dev but predates
+ASN1_STRING_get_length. Test for the actual API, and use a private wrapper
+so the fallback cannot conflict with a newer OpenSSL declaration. Keep the
+existing non-negative conversion used with older OpenSSL versions.
+
+---
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1062,6 +1062,10 @@ if(USE_OPENSSL)
+   if(NOT DEFINED HAVE_SSL_SET0_WBIO)
+     curl_openssl_check_exists("SSL_set0_wbio" HAVE_SSL_SET0_WBIO)
+   endif()
++  if(NOT DEFINED HAVE_ASN1_STRING_GET_LENGTH)
++    curl_openssl_check_exists("ASN1_STRING_get_length" "openssl/asn1.h"
++                              HAVE_ASN1_STRING_GET_LENGTH)
++  endif()
+ endif()
+ 
+ option(USE_HTTPSRR "Enable HTTPS RR support (experimental)" OFF)
+diff --git a/lib/curl_config-cmake.h.in b/lib/curl_config-cmake.h.in
+--- a/lib/curl_config-cmake.h.in
++++ b/lib/curl_config-cmake.h.in
+@@ -460,6 +460,9 @@
+ /* Define to 1 if OpenSSL has the `SSL_set0_wbio` function. */
+ #cmakedefine HAVE_SSL_SET0_WBIO 1
+ 
++/* Define to 1 if OpenSSL provides ASN1_STRING_get_length. */
++#cmakedefine HAVE_ASN1_STRING_GET_LENGTH 1
++
+ /* Define to 1 if you have the recv function. */
+ #cmakedefine HAVE_RECV 1
+ 
+diff --git a/lib/vtls/openssl.c b/lib/vtls/openssl.c
+--- a/lib/vtls/openssl.c
++++ b/lib/vtls/openssl.c
+@@ -172,13 +172,15 @@
+ #endif
+ #define ossl_valsize_t numcert_t
+ 
+-#if OPENSSL_VERSION_NUMBER < 0x40100000L
+-static size_t ASN1_STRING_get_length(const ASN1_STRING *str)
++static size_t ossl_asn1_string_length(const ASN1_STRING *str)
+ {
++#ifdef HAVE_ASN1_STRING_GET_LENGTH
++   return ASN1_STRING_get_length(str);
++#else
+    const int length = ASN1_STRING_length(str);
+    return length >= 0 ? (size_t)length : 0;
+-}
+ #endif
++}
+ 
+ static CURLcode push_certinfo(struct Curl_easy *data,
+                               BIO *mem, const char *label, int num)
+@@ -429,7 +431,7 @@
+     {
+       ASN1_INTEGER *num = X509_get_serialNumber(x);
+       const unsigned char *numdata = ASN1_STRING_get0_data(num);
+-      const size_t numlen = ASN1_STRING_get_length(num);
++      const size_t numlen = ossl_asn1_string_length(num);
+       if(ASN1_STRING_type(num) == V_ASN1_NEG_INTEGER)
+         BIO_puts(mem, "-");
+       for(j = 0; j < numlen; j++)
+@@ -504,7 +506,7 @@
+ 
+     if(!result && psig) {
+       const unsigned char *psigdata = ASN1_STRING_get0_data(psig);
+-      const size_t psiglen = ASN1_STRING_get_length(psig);
++      const size_t psiglen = ossl_asn1_string_length(psig);
+       for(j = 0; j < psiglen; j++)
+         BIO_printf(mem, "%02x:", psigdata[j]);
+       result = push_certinfo(data, mem, "Signature", i);
+@@ -2095,7 +2097,7 @@
+       if(check->type == target) {
+         /* get data and length */
+         const char *altptr = (const char *)ASN1_STRING_get0_data(check->d.ia5);
+-        size_t altlen = ASN1_STRING_get_length(check->d.ia5);
++        size_t altlen = ossl_asn1_string_length(check->d.ia5);
+ 
+         switch(target) {
+         case GEN_DNS: /* name/pattern comparison */
+@@ -2166,7 +2168,7 @@
+          conditional in the future when OpenSSL has been fixed. */
+       if(tmp) {
+         if(ASN1_STRING_type(tmp) == V_ASN1_UTF8STRING) {
+-          cnlen = ASN1_STRING_get_length(tmp);
++          cnlen = ossl_asn1_string_length(tmp);
+           cn = (unsigned char *)CURL_UNCONST(ASN1_STRING_get0_data(tmp));
+         }
+         else { /* not a UTF8 name */

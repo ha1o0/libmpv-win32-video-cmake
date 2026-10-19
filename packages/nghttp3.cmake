@@ -8,7 +8,9 @@ ExternalProject_Add(nghttp3
     GIT_CLONE_FLAGS "--filter=tree:0"
     GIT_SUBMODULES lib/sfparse
     UPDATE_COMMAND ""
-    CONFIGURE_COMMAND ${EXEC} CONF=1 cmake -S <SOURCE_DIR> -B <BINARY_DIR>
+    # A reused source cache can retain sfparse from before the source pin.
+    CONFIGURE_COMMAND ${EXEC} git -C <SOURCE_DIR> submodule update --init lib/sfparse
+    COMMAND ${EXEC} CONF=1 cmake -S <SOURCE_DIR> -B <BINARY_DIR>
         -G Ninja
         -DCMAKE_BUILD_TYPE=Release
         -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}

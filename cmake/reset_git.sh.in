@@ -1,0 +1,76 @@
+#!/bin/bash
+set -eu
+
+source_dir='@source_dir@'
+stamp_dir='@stamp_dir@'
+name='@_name@'
+tag='@git_tag@'
+pin='@git_reset@'
+remote='@git_remote_name@'
+recipe='@recipe_hash@'
+
+if [[ "${1:-}" == --cleanup ]]; then
+    # Keep applied patch commits, but retire configure-time source edits after
+    # a successful install. Nothing downstream needs rebuilding at this point.
+    git -C "$source_dir" reset --hard -q
+    exit
+fi
+
+resolve_commit() {
+    git -C "$source_dir" rev-parse --verify --quiet "$1^{commit}" 2>/dev/null
+}
+
+fetch_commit() {
+    # Older upstream caches may be shallow and not contain our fixed snapshot.
+    git -C "$source_dir" fetch --filter=tree:0 --no-recurse-submodules \
+        "$remote" "$1" >&2
+    resolve_commit FETCH_HEAD
+}
+
+if [[ -n "$pin" ]]; then
+    target=$(resolve_commit "$pin" || fetch_commit "$pin")
+elif [[ -n "$tag" ]]; then
+    # A named branch must advance to the fetched remote branch. A tag or SHA
+    # must also work on a detached HEAD, without trying to resolve @{u}.
+    target=$(resolve_commit "refs/remotes/$remote/$tag" ||
+             resolve_commit "$tag" || fetch_commit "$tag")
+else
+    target=$(resolve_commit '@{u}' || resolve_commit "refs/remotes/$remote/HEAD")
+fi
+
+if [[ "${1:-}" == --before-patch ]]; then
+    # Called inside the build graph: the write-head timestamp already retires
+    # every downstream stage, so do not delete completed dependency stamps here.
+    git -C "$source_dir" reset --hard "$target" -q
+    printf '%s\n' "$target" > "$stamp_dir/HEAD"
+    printf '%s\n' "$recipe" > "$stamp_dir/RECIPE"
+    exit
+fi
+
+previous_head=$(cat "$stamp_dir/HEAD" 2>/dev/null || true)
+previous_recipe=$(cat "$stamp_dir/RECIPE" 2>/dev/null || true)
+reason=''
+if [[ ! -f "$stamp_dir/$name-patch" ||
+      "$stamp_dir/$name-download" -nt "$stamp_dir/$name-patch" ||
+      "$previous_head" != "$target" ]]; then
+    reason='source revision or patch state changed'
+elif [[ -n "$previous_recipe" && "$previous_recipe" != "$recipe" ]]; then
+    reason='build recipe or patches changed'
+elif [[ -z "$previous_recipe" ]]; then
+    # Even a completed legacy cache cannot prove which recipe or patch contents
+    # produced it. Rebuild once before recording the current fingerprint.
+    reason='legacy build cache without recipe fingerprint'
+elif ! git -C "$source_dir" diff --quiet --ignore-submodules=untracked HEAD --; then
+    reason='reset would discard configure-time source changes'
+fi
+
+if [[ -n "$reason" ]]; then
+    git -C "$source_dir" reset --hard "$target" -q
+    # Invalidate every stage together, including Meson metadata preparation.
+    # In particular, fixed GIT_RESET dependencies need the same invalidation
+    # as tracking branches; leaving their build stamps alive is unsafe.
+    find "$stamp_dir" -type f ! -name '*.cmake' -size 0c -delete
+    printf '%s\n' "$target" > "$stamp_dir/HEAD"
+    printf 'Rebuilding %s: %s.\n' "$name" "$reason"
+fi
+printf '%s\n' "$recipe" > "$stamp_dir/RECIPE"

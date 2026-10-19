@@ -23,6 +23,10 @@ function(cleanup _name _last_step)
         set(COMMAND_FORCE_UPDATE COMMAND bash -c "git -C <SOURCE_DIR> am --abort 2> /dev/null || true"
                                  COMMAND ${stamp_dir}/reset_head.sh
                                  COMMAND bash -c "git -C <SOURCE_DIR> restore .")
+        set(COMMAND_POSTREMOVE_UPDATE
+            COMMAND bash -c "git -C <SOURCE_DIR> am --abort 2> /dev/null || true"
+            COMMAND ${stamp_dir}/reset_head.sh --cleanup
+            COMMAND bash -c "git -C <SOURCE_DIR> restore .")
     endif()
 
     # <STAMP_DIR> doesn't resolve into full path, so <LOG_DIR> is used instead since its same folder.
@@ -49,7 +53,8 @@ function(cleanup _name _last_step)
     ExternalProject_Add_Step(${_name} postremovebuild
         DEPENDEES ${_last_step}
         COMMAND ${EXEC} ${remove_cmd}
-        ${COMMAND_FORCE_UPDATE}
+        # Successful cleanup must not invalidate the completed build stamps.
+        ${COMMAND_POSTREMOVE_UPDATE}
         LOG 1
         COMMENT "Deleting build directory of ${_name} package after install"
     )
@@ -83,28 +88,25 @@ function(force_rebuild_git _name)
     get_property(stamp_dir TARGET ${_name} PROPERTY _EP_STAMP_DIR)
     get_property(source_dir TARGET ${_name} PROPERTY _EP_SOURCE_DIR)
 
-    if("${git_remote_name}" STREQUAL "" AND NOT "${git_tag}" STREQUAL "")
-        # GIT_REMOTE_NAME is not set when commit hash is specified
-        set(reset "")
-    elseif(NOT "${git_reset}" STREQUAL "")
-        set(reset "${git_reset}")
-    else()
-        set(reset "@{u}") # eg: origin/master
+    if("${git_remote_name}" STREQUAL "")
+        set(git_remote_name origin)
     endif()
-
-file(WRITE ${stamp_dir}/reset_head.sh
-"#!/bin/bash
-set -e
-if [[ ! -f \"${stamp_dir}/${_name}-patch\"  || \"${stamp_dir}/${_name}-download\" -nt \"${stamp_dir}/${_name}-patch\" || ! -f \"${stamp_dir}/HEAD\" || \"$(cat ${stamp_dir}/HEAD)\" != \"$(git -C ${source_dir} rev-parse @{u})\" ]]; then
-    git -C ${source_dir} reset --hard ${reset} -q
-    if [[ -z \"${git_reset}\" ]]; then
-        find \"${stamp_dir}\" -type f  ! -iname '*.cmake' -size 0c -delete
-        echo \"Removing ${_name} stamp files.\"
-        git -C ${source_dir} rev-parse HEAD > ${stamp_dir}/HEAD
-    fi
-else
-    git -C ${source_dir} reset --hard -q
-fi")
+    # A recipe/patch change must also retire a cached configure/build/install.
+    # CMake's individual command stamps cannot account for source edits removed
+    # by git reset, or a build directory already deleted after installation.
+    file(SHA256 "${CMAKE_CURRENT_LIST_FILE}" recipe_hash)
+    file(GLOB recipe_patches "${CMAKE_CURRENT_SOURCE_DIR}/${_name}-*.patch")
+    foreach(recipe_patch IN LISTS recipe_patches)
+        file(SHA256 "${recipe_patch}" patch_hash)
+        string(APPEND recipe_hash ";${recipe_patch}:${patch_hash}")
+    endforeach()
+    foreach(phase PATCH CONFIGURE BUILD INSTALL)
+        get_property(phase_command TARGET ${_name} PROPERTY _EP_${phase}_COMMAND)
+        string(APPEND recipe_hash ";${phase}:${phase_command}")
+    endforeach()
+    string(SHA256 recipe_hash "${recipe_hash}")
+    configure_file(${CMAKE_CURRENT_FUNCTION_LIST_DIR}/reset_git.sh.in
+                   ${stamp_dir}/reset_head.sh @ONLY)
 file(CHMOD ${stamp_dir}/reset_head.sh 
 PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 
@@ -120,10 +122,13 @@ PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_
     ExternalProject_Add_StepTargets(${_name} force-update)
 
     ExternalProject_Add_Step(${_name} write-head
+        DEPENDEES update
         DEPENDERS patch
         INDEPENDENT TRUE
         WORKING_DIRECTORY <SOURCE_DIR>
-        COMMAND bash -c "git rev-parse HEAD > ${stamp_dir}/HEAD"
+        # If this step reruns, patch and every later stage rerun too. Start at
+        # the requested base so cached patch commits are never applied twice.
+        COMMAND ${stamp_dir}/reset_head.sh --before-patch
         LOG 1
     )
 

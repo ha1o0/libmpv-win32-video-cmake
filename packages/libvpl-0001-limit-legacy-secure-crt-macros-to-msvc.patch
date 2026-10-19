@@ -1,0 +1,28 @@
+From: Floe contributors <recipe@example.invalid>
+Subject: [PATCH] windows: limit legacy secure CRT macros to old MSVC
+
+MinGW does not define _MSC_VER, so the preprocessor treats it as zero in
+the version comparison. This incorrectly enables the legacy wcscpy_s and
+wcscat_s macros, even though MinGW provides these functions. When windows.h
+is included afterwards, the statement macro breaks the wcscpy_s expression
+in stralign.h's ua_wcscpy_s inline function.
+
+Only provide the compatibility macros for the old MSVC versions that need
+them. Leave MinGW's secure CRT functions and the MSVC paths unchanged.
+
+---
+ libvpl/src/windows/mfx_dispatcher_defs.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/libvpl/src/windows/mfx_dispatcher_defs.h b/libvpl/src/windows/mfx_dispatcher_defs.h
+--- a/libvpl/src/windows/mfx_dispatcher_defs.h
++++ b/libvpl/src/windows/mfx_dispatcher_defs.h
+@@ -17,7 +17,7 @@
+ #define MAX_PLUGIN_PATH 4096
+ #define MAX_PLUGIN_NAME 4096
+ 
+-#if _MSC_VER < 1400
++#if defined(_MSC_VER) && _MSC_VER < 1400
+     #define wcscpy_s(to, to_size, from) \
+         (void)(to_size);                \
+         wcscpy(to, from)

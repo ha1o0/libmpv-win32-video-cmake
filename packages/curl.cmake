@@ -18,6 +18,7 @@ ExternalProject_Add(curl
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
     PATCH_COMMAND ${EXEC} git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/curl-0001-libssh-include-scp-declarations.patch
+        ${CMAKE_CURRENT_SOURCE_DIR}/curl-0002-detect-asn1-string-length-api.patch
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ${EXEC} CONF=1 cmake -S <SOURCE_DIR> -B <BINARY_DIR>
         -G Ninja
@@ -76,10 +77,21 @@ ExternalProject_Add(curl
 # target's metadata before mpv can consume it; no Windows executable is run here.
 ExternalProject_Add_Step(curl verify-features
     DEPENDEES install
+    DEPENDS
+        ${PROJECT_SOURCE_DIR}/cmake/verify_curl_features.cmake
+        ${PROJECT_SOURCE_DIR}/cmake/curl_link_check/CMakeLists.txt
+        ${PROJECT_SOURCE_DIR}/cmake/curl_link_check/check.c
     COMMAND ${CMAKE_COMMAND}
         -DCURL_PC=${MINGW_INSTALL_PREFIX}/lib/pkgconfig/libcurl.pc
         -DCURL_CONFIG=${MINGW_INSTALL_PREFIX}/bin/curl-config
         -P ${PROJECT_SOURCE_DIR}/cmake/verify_curl_features.cmake
+    # Metadata alone cannot catch missing static/transitive symbols. Link a
+    # Windows DLL with the same target pkg-config setup before mpv consumes it.
+    COMMAND ${EXEC} CONF=1 ${CMAKE_COMMAND}
+        -S ${PROJECT_SOURCE_DIR}/cmake/curl_link_check
+        -B <BINARY_DIR>/link-check -G Ninja
+        -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE}
+    COMMAND ${EXEC} CONF=1 ${CMAKE_COMMAND} --build <BINARY_DIR>/link-check
     LOG 1
 )
 

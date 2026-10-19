@@ -116,7 +116,7 @@ The default GitHub Actions target list is `["x86_64"]`. To build more clang targ
 ### Windows HTTP/2 and HTTP/3 transport
 
 The fork build explicitly enables mpv's libcurl stream backend. It builds pinned
-curl 8.23.0, nghttp2 1.70.0, nghttp3 1.18.0, ngtcp2 1.25.0 and c-ares 1.34.8
+curl 8.23.0-DEV, nghttp2 1.70.0, nghttp3 1.18.0, ngtcp2 1.25.0 and c-ares 1.34.8
 as static libraries. OpenSSL and libpsl use the same pinned snapshots as
 upstream mpv-winbuild-cmake (`1f8d2e76255abc48f0456d9be99b4cab9c6566e6`).
 The OpenSSL pin is a 4.1.0-dev snapshot, matching upstream rather than a floating
@@ -127,13 +127,23 @@ records, SSL session export, HTTP/3 proxy support, SSPI, Unicode, libpsl and
 libssh. zlib, brotli and zstd support remain available. No separate `curl.exe`
 or networking DLLs are needed in the downstream app package.
 The installed target metadata is checked for these features and static-link
-dependencies before mpv builds. Missing capabilities fail the build.
+dependencies before mpv builds. A Windows DLL link check also exercises the
+static curl/TLS dependency graph. Missing capabilities or link dependencies fail
+the build. A compatibility patch detects the ASN.1 string-length API: the pinned
+OpenSSL 4.1.0-dev snapshot predates that API despite its version number.
 
 Use the **mpv clang** workflow with `build_targets=["x86_64"]` initially. Leave
 `mpv_tarball`, `sourceforge`, `github_release` and `run_gcc` disabled to build the
 custom `zcopy` kernel and collect the `libmpv-x86_64-dev` test artifact only.
 The existing compiler/toolchain caches can be reused; leave the custom command
-field empty. New dependencies participate in `download`/`update`. OpenSSL's
+field empty. Git dependency caches without a recorded recipe fingerprint are
+rebuilt once, including previously completed dependencies: an old completion
+stamp cannot prove that the current recipe and patches produced the library.
+This first migration can rebuild most packages. After migration, completed
+dependencies are reused where their source and recipe still match; subsequent
+source, recipe or patch changes invalidate their stages together. This prevents
+Git resets from discarding configure-time source edits while retaining old
+build/install stamps. New dependencies participate in `download`/`update`. OpenSSL's
 explicit QUIC/ECH configuration also invalidates an older cached configuration.
 FFmpeg and libssh may rebuild against the pinned OpenSSL, but their feature
 configuration and FFmpeg's fixed revision are unchanged. The fork's video/render
@@ -152,7 +162,9 @@ caps connect timeout by it, excluding ring-buffer backpressure. Optional
 `curl-reconnect-streamed=yes` permits bounded unseekable HTTP reconnects;
 `curl-retry-delay-max=5` schedules 1/3/5-second backoff without stalling other
 transfers. Closing, cancellation and seeking retire pending retries. The app
-checks these options before enabling curl, retaining FFmpeg on incomplete cores.
+can check these options before enabling curl on other cores. This build's pinned
+FFmpeg is 63.2.100, which satisfies the fork's default-curl version guard; the
+current bota main branch does not explicitly set the new curl policy options.
 `curl-enabled=no` selects the existing FFmpeg transport for A/B
 testing. The upstream release-tarball build path is unchanged and is not the
 custom-kernel test path. Validate playback, proxy/authentication, subtitles,
@@ -167,6 +179,16 @@ python tests/test_curl_network_policy.py --mpv-source /path/to/mpv
 For a Windows static libcurl installation, add `--curl-prefix /path/to/prefix`.
 This tests actual patched C functions against local HTTP fixtures, not a full
 mpv cross build. It does not modify the supplied source checkout.
+
+Git source/cache lifecycle regressions (Python >= 3.8, CMake >= 3.24, Ninja and
+Git; no network required):
+
+```sh
+python tests/test_git_cache.py
+```
+
+See [the Windows curl build audit](docs/windows-curl-build-audit.md) for the
+commit-by-commit review, upstream comparison and remaining runtime checks.
 
 ## Compiling with Clang
 
