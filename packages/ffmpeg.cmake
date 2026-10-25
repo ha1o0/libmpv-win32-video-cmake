@@ -53,6 +53,8 @@ ExternalProject_Add(ffmpeg
     GIT_RESET f1126f23380c805b4b8fd69351d189aeac8b892b
     GIT_CLONE_POST_COMMAND "sparse-checkout set --no-cone /* !tests/ref/fate"
     UPDATE_COMMAND ""
+    PATCH_COMMAND ${EXEC} git apply --whitespace=error-all
+        ${CMAKE_CURRENT_SOURCE_DIR}/ffmpeg-0001-mov-bounded-interleave.patch
     CONFIGURE_COMMAND ${EXEC} CONF=1 <SOURCE_DIR>/configure
         --cross-prefix=${TARGET_ARCH}-
         --prefix=${MINGW_INSTALL_PREFIX}

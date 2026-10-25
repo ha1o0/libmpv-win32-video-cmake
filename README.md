@@ -16,6 +16,40 @@ Alternatively, you can download the builds from [here](https://sourceforge.net/p
 -   Compiling on Cygwin / MSYS2 is supported, but it tends to be slower
     than compiling on Linux.
 
+## Bounded MP4 packet reads
+
+The FFmpeg recipe applies `packages/ffmpeg-0001-mov-bounded-interleave.patch`.
+It adds an opt-in, time- and byte-bounded physical read policy for flat MOV/MP4
+files with widely separated selected audio/video tracks. It does not replace
+the default FFmpeg packet order globally, change MKV handling, or allocate an
+additional byte cache.
+The preload byte count is cumulative within each fixed time window; intervening
+subtitles or short audio runs cannot reset it and bypass the preload budget.
+
+The FFmpeg source remains pinned to
+`f1126f23380c805b4b8fd69351d189aeac8b892b` (`RELEASE=8.0.git`). This is not an
+upgrade/downgrade to FFmpeg 7.1.5; that version requires a separate patch port.
+Build mpv from the corresponding source containing
+`demuxer-lavf-mp4-read-strategy` so seekable finite HTTP(S) MP4 playback can opt in.
+An older mpv will retain legacy ordering even with the patched FFmpeg library.
+
+The canonical patch and design/validation notes live in the mpv source at
+`TOOLS/ffmpeg/`. The design references
+[VLC's bounded MP4 preload](https://github.com/videolan/vlc/blob/master/modules/demux/mp4/mp4.c).
+The two repositories intentionally carry identical FFmpeg patches. Check both
+the production C policy and that correspondence with:
+
+```sh
+python3 /path/to/mpv/test/lavf_mp4_read.py \
+  --ffmpeg-source /path/to/pinned-ffmpeg \
+  --recipe /path/to/libmpv-win32-video-cmake
+```
+
+This test needs Git, CMake and a C11 compiler. It works on native Windows with
+Visual Studio as well as Linux; pass `--cmake` if CMake is not on `PATH`.
+Rebuild FFmpeg and mpv together after updating these sources. The test does not
+replace the running application's DLL or confirm real rendering/network playback.
+
 ## Setup Build Environment
 ### Manjaro / Arch Linux
 
