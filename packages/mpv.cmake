@@ -66,6 +66,7 @@ ExternalProject_Add(mpv
     BUILD_COMMAND ${EXEC} LTO_JOB=1 PDB=1 ninja -C <BINARY_DIR>
     INSTALL_COMMAND ""
     LOG_DOWNLOAD 1 LOG_UPDATE 1 LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1
+    LOG_OUTPUT_ON_FAILURE 1
 )
 
 ExternalProject_Add_Step(mpv strip-binary
