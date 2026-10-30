@@ -8,7 +8,10 @@ ExternalProject_Add(fontconfig
     SOURCE_DIR ${SOURCE_LOCATION}
     UPDATE_COMMAND ""
     GIT_REMOTE_NAME origin
-    GIT_TAG main
+    # Keep the snapshot supported by both local patches. The subsequent portal
+    # indexer refactor (b6cf4b2) changes fcdir.c and breaks the scan patch.
+    GIT_TAG 92a27998718172a325c5ea5c2851cc36e0a4ecf1
+    GIT_RESET 92a27998718172a325c5ea5c2851cc36e0a4ecf1
     GIT_CLONE_FLAGS "--filter=tree:0"
     PATCH_COMMAND ${EXEC} git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/fontconfig-*.patch
     CONFIGURE_COMMAND ""
