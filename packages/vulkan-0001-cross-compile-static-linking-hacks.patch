@@ -1,9 +1,11 @@
-From bd454410d15742d361b234c5fe86c35cfc144136 Mon Sep 17 00:00:00 2001
+From c076e5a8d9be248bee3173a53092e60f276d48ee Mon Sep 17 00:00:00 2001
 From: shinchiro <shinchiro@users.noreply.github.com>
 Date: Mon, 19 Oct 2026 07:39:01 +0800
 Subject: [PATCH] loader: cross-compile & static linking hacks
 
-Refresh patch context against Vulkan-Loader 3aba6aeb8786f8369e10e4640f3139f336541c07. Preserve upstream signature changes and the renamed DllMain argument; retain the existing MinGW static-loader changes.
+Refresh patch context against Vulkan-Loader
+9b9488a5447d9bf17064fea6eb30471673160d91 after the clang-format-22 update.
+Preserve upstream declarations and the existing MinGW static-loader changes.
 ---
  loader/CMakeLists.txt       | 24 ++++++------------------
  loader/loader.c             |  4 ++--
@@ -16,7 +18,7 @@ Refresh patch context against Vulkan-Loader 3aba6aeb8786f8369e10e4640f3139f33654
  create mode 100644 loader/vulkan_own.pc.in
 
 diff --git a/loader/CMakeLists.txt b/loader/CMakeLists.txt
-index f29ee7aaef356a96b0057a49a5b71a780bf7d615..93b6360b97307cbf39f76fd45b3304800b764c29 100644
+index 5957081bd8ea8acca989d3110f3c87dbfb203878..494a3fafe25741b6876beb506896036be4d8aa29 100644
 --- a/loader/CMakeLists.txt
 +++ b/loader/CMakeLists.txt
 @@ -22,8 +22,9 @@ include(CheckIncludeFile)
@@ -30,7 +32,7 @@ index f29ee7aaef356a96b0057a49a5b71a780bf7d615..93b6360b97307cbf39f76fd45b330480
  
      if(ENABLE_WIN10_ONECORE)
          # Note: When linking your app or driver to OneCore.lib, be sure to remove any links to non-umbrella libs (such as
-@@ -379,7 +380,7 @@ if(UNKNOWN_FUNCTIONS_SUPPORTED)
+@@ -377,7 +378,7 @@ if(UNKNOWN_FUNCTIONS_SUPPORTED)
      list(APPEND NORMAL_LOADER_SRCS ${OPT_LOADER_SRCS})
  endif()
  
@@ -39,7 +41,7 @@ index f29ee7aaef356a96b0057a49a5b71a780bf7d615..93b6360b97307cbf39f76fd45b330480
      # If BUILD_DLL_VERSIONINFO was set, use the loader.rc in the build dir, otherwise use the checked in file
      set(RC_FILE_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/loader.rc)
      if (NOT "$CACHE{BUILD_DLL_VERSIONINFO}" STREQUAL "")
-@@ -419,21 +420,8 @@ if(WIN32)
+@@ -417,21 +418,8 @@ if(WIN32)
      endif()
  
  else()
@@ -63,7 +65,7 @@ index f29ee7aaef356a96b0057a49a5b71a780bf7d615..93b6360b97307cbf39f76fd45b330480
      target_sources(vulkan PRIVATE ${NORMAL_LOADER_SRCS})
  
      set_target_properties(vulkan PROPERTIES
-@@ -544,7 +532,7 @@ if (BUILD_TESTS)
+@@ -542,7 +530,7 @@ if (BUILD_TESTS)
      target_compile_definitions(vulkan PRIVATE SHOULD_EXPORT_TEST_FUNCTIONS)
  endif()
  
@@ -73,19 +75,19 @@ index f29ee7aaef356a96b0057a49a5b71a780bf7d615..93b6360b97307cbf39f76fd45b330480
      message(NOTICE "Apple STATIC lib: it will be built but not installed, and vulkan.pc and VulkanLoaderConfig.cmake won't be generated!")
      return()
 diff --git a/loader/loader.c b/loader/loader.c
-index 6a7c2cb5289368f5efaf96e5a511c9bc2c0d2e09..4a8aae97c385113b4afb12e479252a21b09759e0 100644
+index f6526864ff2f8dc16ce9f73f6d01d0abff327693..1d9f1acff10f2b7180435207c857e1be847ec980 100644
 --- a/loader/loader.c
 +++ b/loader/loader.c
-@@ -2357,7 +2357,7 @@ out:
+@@ -2159,7 +2159,7 @@ out:
      return res;
  }
  
 -#if defined(_WIN32)
 +#if defined(LOADER_DYNAMIC_LIB)
- BOOL __stdcall loader_initialize(PINIT_ONCE InitOnce, PVOID Parameter, PVOID *Context) {
+ BOOL __stdcall loader_initialize(PINIT_ONCE InitOnce, PVOID Parameter, PVOID* Context) {
      (void)InitOnce;
      (void)Parameter;
-@@ -2395,7 +2395,7 @@ void loader_initialize(void) {
+@@ -2197,7 +2197,7 @@ void loader_initialize(void) {
  #if defined(LOADER_USE_UNSAFE_FILE_SEARCH)
      loader_log(NULL, VULKAN_LOADER_WARN_BIT, 0, "Vulkan Loader: unsafe searching is enabled");
  #endif
@@ -95,7 +97,7 @@ index 6a7c2cb5289368f5efaf96e5a511c9bc2c0d2e09..4a8aae97c385113b4afb12e479252a21
  #endif
  }
 diff --git a/loader/loader.h b/loader/loader.h
-index cebadfe81f14ea0810d45e6702859b835c0c7719..dc71550fc6c248e2b30303c569e04da04d44a0d0 100644
+index 00f587c628c9d06d301c6cb44b7c8a04ae8073b6..79cb95337a8705b937feb23612c950fb0b874c7a 100644
 --- a/loader/loader.h
 +++ b/loader/loader.h
 @@ -33,7 +33,9 @@
@@ -108,13 +110,13 @@ index cebadfe81f14ea0810d45e6702859b835c0c7719..dc71550fc6c248e2b30303c569e04da0
  
  static inline VkPhysicalDevice loader_unwrap_physical_device(VkPhysicalDevice physicalDevice) {
      if (VK_NULL_HANDLE == physicalDevice) {
-@@ -92,7 +94,7 @@ VkResult loader_validate_instance_extensions(struct loader_instance *inst, const
-                                              const struct loader_pointer_layer_list *expanded_layers,
-                                              const VkInstanceCreateInfo *pCreateInfo);
+@@ -92,7 +94,7 @@ VkResult loader_validate_instance_extensions(struct loader_instance* inst, const
+                                              const struct loader_pointer_layer_list* expanded_layers,
+                                              const VkInstanceCreateInfo* pCreateInfo);
  
 -#if defined(_WIN32)
 +#if defined(LOADER_DYNAMIC_LIB)
- BOOL __stdcall loader_initialize(PINIT_ONCE InitOnce, PVOID Parameter, PVOID *Context);
+ BOOL __stdcall loader_initialize(PINIT_ONCE InitOnce, PVOID Parameter, PVOID* Context);
  #else
  void loader_initialize(void);
 diff --git a/loader/loader.rc.in b/loader/loader.rc.in
@@ -134,7 +136,7 @@ index 0dc4227da250d774fb2a0ed4eb3532568b4c1ca7..e7fcea06fc54a97ea3dd1d830f7a3fe9
  // All set through CMake
  #define VER_FILE_VERSION ${LOADER_VER_FILE_VERSION}
 diff --git a/loader/loader_windows.c b/loader/loader_windows.c
-index 2424f5e8446c6b88950e97c706279f4b687e4c90..a8d94ae56db5ca3457da4211c5531eb4ea2dbd5a 100644
+index 2cb74bb2ddc03ed5f64feffc983b985d2a5991f9..3a5d523331504034839fdcf51d58dbcc9ff60276 100644
 --- a/loader/loader_windows.c
 +++ b/loader/loader_windows.c
 @@ -98,6 +98,7 @@ void windows_initialization(void) {
@@ -151,19 +153,18 @@ index 2424f5e8446c6b88950e97c706279f4b687e4c90..a8d94ae56db5ca3457da4211c5531eb4
  }
 +#endif
  
- VkResult windows_add_json_entry(const struct loader_instance *inst, struct loader_string_list *search_paths,
+ VkResult windows_add_json_entry(const struct loader_instance* inst, struct loader_string_list* search_paths,
                                  LPCSTR key_name,  // key name - used for debug prints - i.e. VulkanDriverName
 diff --git a/loader/vk_loader_platform.h b/loader/vk_loader_platform.h
-index d642961c51ce559b775dd64cc1d0a642227291c5..028e0e2c92522b7c8b729fa8622faef31c0790ed 100644
+index 5b0b6390e1632c8b3a06b928d96d0d957cc575ca..2df06f6b1326d7f2e03bd44d8c4a02d07023a6bb 100644
 --- a/loader/vk_loader_platform.h
 +++ b/loader/vk_loader_platform.h
-@@ -71,15 +71,12 @@
+@@ -71,14 +71,11 @@
  #include <io.h>
  #include <shlwapi.h>
  #include <direct.h>
 +#include <pthread.h> // for mingw
  
- #include "stack_allocation.h"
  #endif  // defined(_WIN32)
  
 -#if defined(APPLE_STATIC_LOADER) && !defined(__APPLE__)
@@ -175,22 +176,22 @@ index d642961c51ce559b775dd64cc1d0a642227291c5..028e0e2c92522b7c8b729fa8622faef3
  #define LOADER_EXPORT
  #elif defined(__GNUC__) && __GNUC__ >= 4
  #define LOADER_EXPORT __attribute__((visibility("default")))
-@@ -260,7 +257,7 @@ static inline bool loader_platform_is_path(const char *path) { return strchr(pat
+@@ -256,7 +253,7 @@ static inline bool loader_platform_is_path(const char* path) { return strchr(pat
  // API call made, using InitOnceExecuteOnce, except for initialization primitives which must be done in DllMain. This is because
  // there is no way to clean up the resources allocated by anything allocated by once init.
  
 -#if defined(APPLE_STATIC_LOADER)
 +#if defined(BUILD_STATIC_LOADER)
- static inline void loader_platform_thread_once_fn(pthread_once_t *ctl, void (*func)(void)) {
+ static inline void loader_platform_thread_once_fn(pthread_once_t* ctl, void (*func)(void)) {
      assert(func != NULL);
      assert(ctl != NULL);
-@@ -269,7 +266,7 @@ static inline void loader_platform_thread_once_fn(pthread_once_t *ctl, void (*fu
+@@ -265,7 +262,7 @@ static inline void loader_platform_thread_once_fn(pthread_once_t* ctl, void (*fu
  #define LOADER_PLATFORM_THREAD_ONCE_DECLARATION(var) pthread_once_t var = PTHREAD_ONCE_INIT;
  #define LOADER_PLATFORM_THREAD_ONCE_EXTERN_DEFINITION(var) extern pthread_once_t var;
  #define LOADER_PLATFORM_THREAD_ONCE(ctl, func) loader_platform_thread_once_fn(ctl, func);
 -#elif defined(WIN32)
 +#elif defined(LOADER_DYNAMIC_LIB)
- static inline void loader_platform_thread_win32_once_fn(INIT_ONCE *ctl, PINIT_ONCE_FN func) {
+ static inline void loader_platform_thread_win32_once_fn(INIT_ONCE* ctl, PINIT_ONCE_FN func) {
      InitOnceExecuteOnce(ctl, func, NULL, NULL);
  }
 diff --git a/loader/vulkan_own.pc.in b/loader/vulkan_own.pc.in
@@ -211,5 +212,5 @@ index 0000000000000000000000000000000000000000..ed2f30bb2c2beb96b375e7e2d8244913
 +Libs.private: -lshlwapi -lcfgmgr32
 +Cflags: -I${includedir}
 -- 
-2.53.0.windows.3
+2.39.5 (Apple Git-154)
 
