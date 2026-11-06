@@ -69,8 +69,15 @@ ExternalProject_Add(mpv
     LOG_OUTPUT_ON_FAILURE 1
 )
 
-ExternalProject_Add_Step(mpv strip-binary
+ExternalProject_Add_Step(mpv verify-secondary-subtitle-style
     DEPENDEES build
+    COMMAND ${EXEC} python3 ${PROJECT_SOURCE_DIR}/tests/verify_secondary_subtitle_artifact.py <BINARY_DIR>/libmpv-2.dll
+    COMMENT "Checking independent secondary subtitle options in libmpv"
+    ALWAYS 1
+)
+
+ExternalProject_Add_Step(mpv strip-binary
+    DEPENDEES verify-secondary-subtitle-style
     ${mpv_add_debuglink}
     COMMENT "Stripping mpv binaries"
 )

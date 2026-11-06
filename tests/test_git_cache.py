@@ -305,6 +305,42 @@ install(TARGETS cache_fixture ARCHIVE DESTINATION lib)
         self.assertEqual((self.stamp / "fixture-install").stat().st_mtime_ns,
                          installed_at)
 
+    def test_removed_upstreamed_patch_recovers_failed_cached_am(self):
+        # Reproduce libvpl: upstream already contains our fix, but a restored
+        # recipe still runs git am. Removing the patch must also recover the
+        # failed Git state and retire the old configure/install stamps.
+        patch = self.root / "fixture-0001.patch"
+        (self.seed / "source.txt").write_text("fixed upstream\n")
+        run("git", "commit", "-qam", "upstream fix", cwd=self.seed)
+        generated = run("git", "format-patch", "-1", "--stdout", cwd=self.seed)
+        # The removed libvpl patch had no blob IDs for --3way to reconstruct.
+        patch.write_text("\n".join(line for line in generated.splitlines()
+                                   if not line.startswith("index ")) + "\n")
+        run("git", "push", "-q", str(self.remote), "main", cwd=self.seed)
+        installed = self.root / "installed-source.txt"
+        project = self.harness.read_text().replace(
+            'UPDATE_COMMAND "" CONFIGURE_COMMAND "" BUILD_COMMAND "" INSTALL_COMMAND "")',
+            f'''PATCH_COMMAND git am --3way "{patch}"
+ UPDATE_COMMAND "" CONFIGURE_COMMAND "" BUILD_COMMAND ""
+ INSTALL_COMMAND "${{CMAKE_COMMAND}}" -E copy <SOURCE_DIR>/source.txt "{installed}")''', 1)
+        self.harness.write_text(project)
+        run("cmake", "-S", str(self.root), "-B", str(self.build))
+        run("cmake", "--build", str(self.build), "--target", "fixture-force-update")
+        failed = subprocess.run(
+            ["cmake", "--build", str(self.build), "--target", "fixture"],
+            text=True, capture_output=True, timeout=60)
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertTrue((self.source / ".git/rebase-apply").exists())
+
+        patch.unlink()
+        self.harness.write_text(project.replace(
+            f'PATCH_COMMAND git am --3way "{patch}"\n ', ""))
+        run("cmake", "--fresh", "-S", str(self.root), "-B", str(self.build))
+        run("cmake", "--build", str(self.build), "--target", "fixture-force-update")
+        run("cmake", "--build", str(self.build), "--target", "fixture")
+        self.assertEqual(installed.read_text(), "fixed upstream\n")
+        self.assertFalse((self.source / ".git/rebase-apply").exists())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

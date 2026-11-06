@@ -50,6 +50,22 @@ Visual Studio as well as Linux; pass `--cmake` if CMake is not on `PATH`.
 Rebuild FFmpeg and mpv together after updating these sources. The test does not
 replace the running application's DLL or confirm real rendering/network playback.
 
+## Independent secondary subtitles
+
+The default mpv source is `ha1o0/mpv` on branch `zcopy`. Commit and push the mpv
+changes implementing `secondary-sub-style=independent` before starting a new
+build. The mpv recipe verifies independent style and text/image HDR option
+markers in `libmpv-2.dll` after compilation and before stripping/packaging, so a
+stale source or cached DLL fails the build.
+
+This marker check runs on the cross-build host; it is not a Windows playback
+test. On Windows, run `python test/secondary_subtitle_style.py --library
+C:/path/to/libmpv-2.dll` from the mpv source to check actual SRT/ASS rendering.
+It verifies that changing either subtitle's appearance preserves the other
+subtitle and its track selection. HDR option checks verify separate values,
+not display luminance. Existing clients keep shared appearance until they opt
+in to independent secondary styling.
+
 ## Setup Build Environment
 ### Manjaro / Arch Linux
 
