@@ -72,7 +72,8 @@ ExternalProject_Add(mpv
 ExternalProject_Add_Step(mpv verify-secondary-subtitle-style
     DEPENDEES build
     COMMAND ${EXEC} python3 ${PROJECT_SOURCE_DIR}/tests/verify_secondary_subtitle_artifact.py <BINARY_DIR>/libmpv-2.dll
-    COMMENT "Checking independent secondary subtitle options in libmpv"
+    COMMAND ${EXEC} python3 ${PROJECT_SOURCE_DIR}/tests/verify_cache_artifact.py <BINARY_DIR>/libmpv-2.dll
+    COMMENT "Checking subtitle and disk cache capabilities in libmpv"
     ALWAYS 1
 )
 
